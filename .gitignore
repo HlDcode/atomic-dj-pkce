@@ -1,0 +1,19 @@
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# R (just in case)
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata

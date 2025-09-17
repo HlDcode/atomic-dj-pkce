@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atomic DJ - Player</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      padding-top: 50px;
+    }
+    button {
+      background-color: #1DB954;
+      border: none;
+      color: white;
+      padding: 15px 30px;
+      font-size: 18px;
+      border-radius: 25px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background-color: #1ed760;
+    }
+    #status {
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+  </style>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+</head>
+<body>
+  <h1>Atomic DJ</h1>
+  <p id="status">Loading player...</p>
+
+  <div>
+    <button id="play">Play</button>
+    <button id="pause">Pause</button>
+    <button id="previous">Previous</button>
+    <button id="next">Next</button>
+  </div>
+
+  <!-- ✅ load the integrated fade logic -->
+  <script src="player.js"></script>
+</body>
+</html>

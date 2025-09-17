@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atomic DJ - Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      padding-top: 100px;
+    }
+    button {
+      background-color: #1DB954;
+      border: none;
+      color: white;
+      padding: 15px 30px;
+      font-size: 18px;
+      border-radius: 25px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1ed760;
+    }
+    #status {
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Atomic DJ</h1>
+  <p id="status">Please log in to Spotify</p>
+  <button id="login">Log in to Spotify</button>
+
+  <script>
+    const backendUrl = 'http://localhost:8888/exchange_token';
+
+    // ---------------- PKCE Helpers ----------------
+    async function generateCodeVerifier(len) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+      return Array.from(crypto.getRandomValues(new Uint8Array(len)))
+        .map(x => chars[x % chars.length])
+        .join('');
+    }
+
+    async function sha256(str) {
+      const buf = new TextEncoder().encode(str);
+      return crypto.subtle.digest('SHA-256', buf);
+    }
+
+    function base64UrlEncode(bytes) {
+      return btoa(String.fromCharCode(...new Uint8Array(bytes)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function generateCodeChallenge(v) {
+      const hashed = await sha256(v);
+      return base64UrlEncode(hashed);
+    }
+
+    // ---------------- Redirect to Spotify ----------------
+    async function redirectToSpotifyAuth() {
+      // Clear tokens only when starting new login
+      localStorage.removeItem('spotify_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('token_expiry');
+      localStorage.removeItem('code_verifier');
+
+      const clientId = 'c2991b13ad5144b682be422d813e0c90';
+      const redirectUri = 'http://127.0.0.1:5500/Client/index.html';
+      const scopes = 'streaming user-read-playback-state user-modify-playback-state app-remote-control';
+
+      const verifier = await generateCodeVerifier(128);
+      const challenge = await generateCodeChallenge(verifier);
+      localStorage.setItem('code_verifier', verifier);
+
+      const state = Math.random().toString(36).substring(2, 15);
+      const url = new URL('https://accounts.spotify.com/authorize');
+      url.searchParams.append('client_id', clientId);
+      url.searchParams.append('response_type', 'code');
+      url.searchParams.append('redirect_uri', redirectUri);
+      url.searchParams.append('code_challenge_method', 'S256');
+      url.searchParams.append('code_challenge', challenge);
+      url.searchParams.append('scope', scopes);
+      url.searchParams.append('state', state);
+
+      console.log('➡️ Redirecting to Spotify:', url.toString());
+      window.location = url.toString();
+    }
+
+    // ---------------- Exchange Code for Token ----------------
+    async function fetchAccessToken(code) {
+      const codeVerifier = localStorage.getItem('code_verifier');
+      const redirectUri = 'http://127.0.0.1:5500/Client/index.html';
+
+      console.log('Exchanging token with:', { code, codeVerifier, redirectUri });
+
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }),
+      });
+
+      return await response.json();
+    }
+
+    // ---------------- Handle Redirect After Login ----------------
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.has('code')) {
+        const code = params.get('code');
+        console.log('✅ Found authorization code:', code);
+
+        const tokenData = await fetchAccessToken(code);
+        console.log('🎯 Received token data:', tokenData);
+
+        if (tokenData.access_token) {
+          // Store tokens + expiry
+          localStorage.setItem('spotify_token', tokenData.access_token);
+          if (tokenData.refresh_token) {
+            localStorage.setItem('refresh_token', tokenData.refresh_token);
+          }
+          const expires_in = tokenData.expires_in || 3600;
+          localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
+
+          // ✅ Redirect to the player page
+          window.location.href = 'http://127.0.0.1:5500/Client/player.html';
+        } else {
+          document.getElementById('status').innerText =
+            '❌ Token exchange failed: ' + JSON.stringify(tokenData);
+        }
+      }
+    })();
+
+    // Attach login button
+    document.getElementById('login').onclick = redirectToSpotifyAuth;
+  </script>
+</body>
+</html>
