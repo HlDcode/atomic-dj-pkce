@@ -10,7 +10,7 @@ const app = express();
 const PORT = 8888;
 
 // ✅ Use one single redirect URI from environment or fallback
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5500/Client/index.html';
+const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://atomic-dj.netlify.app/index.html';
 
 app.use(cors());
 app.use(bodyParser.json());

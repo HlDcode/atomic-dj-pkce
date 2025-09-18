@@ -70,7 +70,7 @@
       localStorage.removeItem('code_verifier');
 
       const clientId = 'c2991b13ad5144b682be422d813e0c90';
-      const redirectUri = 'http://127.0.0.1:5500/Client/index.html';
+      const redirectUri = 'https://atomic-dj.netlify.app/index.html';
       const scopes = 'streaming user-read-playback-state user-modify-playback-state app-remote-control';
 
       const verifier = await generateCodeVerifier(128);
@@ -94,7 +94,7 @@
     // ---------------- Exchange Code for Token ----------------
     async function fetchAccessToken(code) {
       const codeVerifier = localStorage.getItem('code_verifier');
-      const redirectUri = 'http://127.0.0.1:5500/Client/index.html';
+      const redirectUri = 'https://atomic-dj.netlify.app/index.html';
 
       console.log('Exchanging token with:', { code, codeVerifier, redirectUri });
 
@@ -128,7 +128,7 @@
           localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
 
           // ✅ Redirect to the player page
-          window.location.href = 'http://127.0.0.1:5500/Client/player.html';
+          window.location.href = 'https://atomic-dj.netlify.app/index.html';
         } else {
           document.getElementById('status').innerText =
             '❌ Token exchange failed: ' + JSON.stringify(tokenData);
