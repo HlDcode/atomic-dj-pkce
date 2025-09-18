@@ -3,7 +3,7 @@ const tokenEndpoint = `${backendUrl}/exchange_token`;
 const refreshEndpoint = `${backendUrl}/refresh_token`;
 
 // ✅ Centralize the redirect URI — must match Spotify dashboard exactly
-const REDIRECT_URI = 'http://127.0.0.1:5500/Client/player.html';
+const REDIRECT_URI = 'https://atomic-dj.netlify.app/index.html';
 
 // ---------------- PKCE Helpers ----------------
 async function generateCodeVerifier(len) {
