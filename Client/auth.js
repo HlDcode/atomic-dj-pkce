@@ -1,4 +1,4 @@
-const backendUrl = 'http://localhost:8888';
+const backendUrl = 'https://atomic-dj-pkce.onrender.com';
 const tokenEndpoint = `${backendUrl}/exchange_token`;
 const refreshEndpoint = `${backendUrl}/refresh_token`;
 
@@ -130,6 +130,9 @@ async function refreshAccessToken() {
       }
       const expires_in = tokenData.expires_in || 3600;
       localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
+
+      // 🚀 After login, send user to player page
+       window.location.href = '/player.html';
 
       // Remove query params and stay on player
       window.history.replaceState({}, document.title, window.location.pathname);

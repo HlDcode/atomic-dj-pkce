@@ -4,7 +4,7 @@ let currentTrackId = null; // to detect track changes
 let fadeStarted = false;   // ensure we fade once per track
 let fadeStartAtSec = null; // when to begin fading (seconds)
 
-const BACKEND_URL = 'http://localhost:8888';
+const BACKEND_URL = 'https://atomic-dj-pkce.onrender.com';
 const REFRESH_ENDPOINT = `${BACKEND_URL}/refresh_token`;
 
 /* ---------------- Refresh Access Token ---------------- */
