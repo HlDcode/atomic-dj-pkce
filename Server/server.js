@@ -103,6 +103,6 @@ app.post('/refresh_token', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Spotify PKCE backend running on http://localhost:${PORT}`);
+  console.log(`🚀 Spotify PKCE backend running on https://atomic-dj-pkce.onrender.com`);
   console.log(`Expected redirect URI: ${REDIRECT_URI}`);
 });
