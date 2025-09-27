@@ -96,9 +96,9 @@
       const codeVerifier = localStorage.getItem('code_verifier');
       const redirectUri = 'https://atomic-dj.netlify.app/player.html';
 
-      console.log('Exchanging token with:', { code, codeVerifier, redirectUri });
+      console.log('Exchanging token with backend:', { code, codeVerifier, redirectUri });
 
-      const response = await fetch(`${backendUrl}/exchange_token`, {
+      const response = await fetch(`${backendUrl}/exchange_token`, {   // ✅ FIXED
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }),
@@ -126,6 +126,13 @@
           }
           const expires_in = tokenData.expires_in || 3600;
           localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
+
+          // 🔍 Debug log to confirm storage before redirect
+          console.log("✅ Tokens stored:", {
+            spotify_token: localStorage.getItem('spotify_token'),
+            refresh_token: localStorage.getItem('refresh_token'),
+            token_expiry: localStorage.getItem('token_expiry'),
+          });
 
           // ✅ Redirect to the player page
           window.location.href = 'https://atomic-dj.netlify.app/player.html';
