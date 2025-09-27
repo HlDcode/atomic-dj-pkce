@@ -9,8 +9,11 @@ dotenv.config();
 const app = express();
 const PORT = 8888;
 
-// ✅ Use one single redirect URI from environment or fallback
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://atomic-dj.netlify.app/index.html';
+// ✅ Redirect URI must match Spotify dashboard exactly
+const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
+if (!REDIRECT_URI) {
+  throw new Error("Missing SPOTIFY_REDIRECT_URI in environment variables");
+}
 
 app.use(cors());
 app.use(bodyParser.json());

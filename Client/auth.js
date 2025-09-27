@@ -2,8 +2,8 @@ const backendUrl = 'https://atomic-dj-pkce.onrender.com';
 const tokenEndpoint = `${backendUrl}/exchange_token`;
 const refreshEndpoint = `${backendUrl}/refresh_token`;
 
-// ✅ Centralize the redirect URI — must match Spotify dashboard exactly
-const REDIRECT_URI = 'https://atomic-dj.netlify.app/index.html';
+// ✅ Direct landing page for auth
+const REDIRECT_URI = 'https://atomic-dj.netlify.app/player.html';
 
 // ---------------- PKCE Helpers ----------------
 async function generateCodeVerifier(len) {
@@ -30,7 +30,7 @@ async function generateCodeChallenge(v) {
 
 // ---------------- Redirect to Spotify ----------------
 async function redirectToSpotifyAuth() {
-  // Clear tokens only when starting new login
+  // Clear tokens when starting fresh login
   localStorage.removeItem('spotify_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('token_expiry');
@@ -61,19 +61,19 @@ async function redirectToSpotifyAuth() {
 async function fetchAccessToken(code) {
   const codeVerifier = localStorage.getItem('code_verifier');
 
-  console.log('Exchanging token with:', { 
-    code, 
-    hasVerifier: !!codeVerifier, 
-    redirect_uri: REDIRECT_URI 
+  console.log('Exchanging token with:', {
+    code,
+    hasVerifier: !!codeVerifier,
+    redirect_uri: REDIRECT_URI
   });
 
   const response = await fetch(tokenEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      code, 
-      code_verifier: codeVerifier, 
-      redirect_uri: REDIRECT_URI // ✅ Always match server
+    body: JSON.stringify({
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: REDIRECT_URI
     }),
   });
 
@@ -131,21 +131,19 @@ async function refreshAccessToken() {
       const expires_in = tokenData.expires_in || 3600;
       localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
 
-      // 🚀 After login, send user to player page
-       window.location.href = '/player.html';
-
-      // Remove query params and stay on player
+      // ✅ Stay on player.html and remove ?code param
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
-      document.getElementById('status').innerText = '❌ Token exchange failed: ' + JSON.stringify(tokenData);
+      document.getElementById('status').innerText =
+        '❌ Token exchange failed: ' + JSON.stringify(tokenData);
     }
   } else {
-    // 🚀 Auto-refresh if token exists and is near expiry
+    // 🚀 Auto-refresh if token exists
     const token = localStorage.getItem('spotify_token');
     const expiry = localStorage.getItem('token_expiry');
 
     if (token && expiry) {
-      if (Date.now() > expiry - 60000) { // refresh 1 min before expiry
+      if (Date.now() > expiry - 60000) {
         const refreshed = await refreshAccessToken();
         if (!refreshed) {
           console.log('⚠️ Token refresh failed — redirecting to login.');
@@ -160,4 +158,7 @@ async function refreshAccessToken() {
 })();
 
 // Attach login button
-document.getElementById('login').onclick = redirectToSpotifyAuth;
+const loginBtn = document.getElementById('login');
+if (loginBtn) {
+  loginBtn.onclick = redirectToSpotifyAuth;
+}
