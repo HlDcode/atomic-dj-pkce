@@ -1,3 +1,9 @@
+console.log("🔑 Player page sees localStorage:", {
+  spotify_token: localStorage.getItem('spotify_token'),
+  refresh_token: localStorage.getItem('refresh_token'),
+  token_expiry: localStorage.getItem('token_expiry'),
+});
+
 let fadeInterval;          // interval for volume fade
 let positionPoller = null; // polls playback position
 let currentTrackId = null; // to detect track changes
