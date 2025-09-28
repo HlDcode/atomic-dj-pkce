@@ -124,12 +124,17 @@ async function refreshAccessToken() {
     console.log('🎯 Received token data:', tokenData);
 
     if (tokenData.access_token) {
+      // Store tokens
       localStorage.setItem('spotify_token', tokenData.access_token);
       if (tokenData.refresh_token) {
         localStorage.setItem('refresh_token', tokenData.refresh_token);
       }
       const expires_in = tokenData.expires_in || 3600;
       localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
+
+      // ✅ Notify player.js that tokens are ready
+      window.dispatchEvent(new Event('spotify_token_ready'));
+      console.log('🔔 Dispatched spotify_token_ready');
 
       // ✅ Remove ?code param but stay on player.html
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -138,6 +143,7 @@ async function refreshAccessToken() {
       document.getElementById('status').innerText =
         '❌ Token exchange failed: ' + JSON.stringify(tokenData);
     }
+
   } else {
     // 🚀 Auto-refresh if token exists
     const token = localStorage.getItem('spotify_token');

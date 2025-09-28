@@ -14,20 +14,19 @@ const BACKEND_URL = 'https://atomic-dj-pkce.onrender.com';
 const REFRESH_ENDPOINT = `${BACKEND_URL}/refresh_token`;
 
 /* ---------------- Refresh Access Token ---------------- */
+// (keep your refreshAccessToken implementation unchanged)
 async function refreshAccessToken() {
   const refresh_token = localStorage.getItem('refresh_token');
   if (!refresh_token) {
     console.warn('No refresh token — cannot refresh, must log in again.');
     return false;
   }
-
   try {
     const response = await fetch(REFRESH_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token })
     });
-
     const data = await response.json();
     if (data.access_token) {
       localStorage.setItem('spotify_token', data.access_token);
@@ -45,8 +44,8 @@ async function refreshAccessToken() {
   }
 }
 
-/* ---------------- Spotify Player Init ---------------- */
-window.onSpotifyWebPlaybackSDKReady = () => {
+/* ---------------- Initialize Player (call only when token exists) ---------------- */
+function initPlayer() {
   let token = localStorage.getItem('spotify_token');
   const playerName = 'Atomic DJ Player';
 
@@ -58,18 +57,18 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   const player = new Spotify.Player({
     name: playerName,
     getOAuthToken: cb => {
-      token = localStorage.getItem('spotify_token'); // always use latest token
+      token = localStorage.getItem('spotify_token'); // always fetch fresh
       cb(token);
     }
   });
 
-  /* ---------- Errors ---------- */
+  // ---------- Error listeners ----------
   player.addListener('initialization_error', ({ message }) => {
     console.error(message);
     updateStatus(`Initialization error: ${message}`);
   });
   player.addListener('authentication_error', async ({ message }) => {
-    console.error(message);
+    console.error('auth err', message);
     updateStatus(`Authentication error: ${message}`);
     console.log('🔄 Attempting token refresh after authentication error...');
     const refreshed = await refreshAccessToken();
@@ -84,13 +83,12 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     updateStatus(`Playback error: ${message}`);
   });
 
-  /* ---------- Track / State changes ---------- */
+  // ---------- Track / State changes ----------
   player.addListener('player_state_changed', state => {
     if (!state) {
       updateStatus('Player state unavailable');
       return;
     }
-
     const { paused, duration, position, track_window } = state;
     const track = track_window.current_track;
     updateStatus(`Now ${paused ? 'paused' : 'playing'}: ${track.name} — ${track.artists.map(a => a.name).join(', ')}`);
@@ -101,18 +99,13 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       fadeStarted = false;
 
       // Compute fade start time:
-      //  - If > 2:00, fade at 1:55 (115s)
-      //  - Else, fade 5 seconds before end
       const durationSec = Math.floor(duration / 1000);
       fadeStartAtSec = Math.max(0, Math.min(115, durationSec - 5));
 
       console.log(`🎵 New track: ${track.name} — duration=${durationSec}s, fadeStartAt=${fadeStartAtSec}s`);
 
       // Reset any running fade
-      if (fadeInterval) {
-        clearInterval(fadeInterval);
-        fadeInterval = null;
-      }
+      if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
 
       // Restore full volume at the very start of the new track
       player.setVolume(1.0)
@@ -121,161 +114,137 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     }
   });
 
-  /* ---------- Fade-out logic ---------- */
+  // ---------- Fade-out logic (unchanged) ----------
   function startFadeOutAndSkip() {
     if (fadeStarted) return;
     fadeStarted = true;
 
     console.log('🎚 Starting 5s fade-out…');
     let volume = 1.0;
-    const stepMs = 250;           // run every 250ms
-    const totalMs = 5000;         // 5s fade
+    const stepMs = 250;
+    const totalMs = 5000;
     const steps = totalMs / stepMs;
-    const step = 1 / steps;       // decrease per tick (0.05)
+    const step = 1 / steps;
 
     if (fadeInterval) clearInterval(fadeInterval);
     fadeInterval = setInterval(async () => {
       volume = Math.max(0, volume - step);
-      try {
-        await player.setVolume(volume);
-      } catch (e) {
-        console.error('Volume set failed:', e);
-      }
+      try { await player.setVolume(volume); } catch (e) { console.error('Volume set failed:', e); }
       console.log(`🔉 Volume: ${(volume * 100).toFixed(0)}%`);
       if (volume <= 0) {
-        clearInterval(fadeInterval);
-        fadeInterval = null;
+        clearInterval(fadeInterval); fadeInterval = null;
         console.log('⏭ Fade complete — skipping track');
         try { await player.nextTrack(); } catch (e) { console.error('nextTrack failed:', e); }
       }
     }, stepMs);
   }
 
-  /* ---------- Ready: make sure playback is on this device, then start poller ---------- */
+  // ---------- ready handler ----------
   player.addListener('ready', async ({ device_id }) => {
     console.log('✅ Ready with Device ID', device_id);
     updateStatus('Player ready. Device ID: ' + device_id);
     window.spotifyDeviceId = device_id;
 
-    // Force transfer to this device so setVolume works
+    // transfer playback to this device
     try {
       const tokenNow = localStorage.getItem('spotify_token');
       await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${tokenNow}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          device_ids: [device_id],
-          play: true // auto-start here if something is queued
-        })
+        headers: { Authorization: `Bearer ${tokenNow}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_ids: [device_id], play: true })
       });
       console.log('🎧 Playback transferred to Web SDK device');
     } catch (err) {
       console.error('❌ Failed to transfer playback automatically:', err);
     }
 
-    // Start a single poller that decides when to fade based on current position
+    // position poller to trigger fade
     if (!positionPoller) {
-      console.log('🕒 Starting position poller…');
       positionPoller = setInterval(async () => {
         try {
           const state = await player.getCurrentState();
-          if (!state) return; // not active
-
+          if (!state) return;
           const positionSec = Math.floor(state.position / 1000);
           const durationSec = Math.floor(state.duration / 1000);
-
-          // If track changed without our listener catching it (rare), recompute fadeStartAt
           const track = state.track_window.current_track;
           if (track && track.id !== currentTrackId) {
-            currentTrackId = track.id;
-            fadeStarted = false;
+            currentTrackId = track.id; fadeStarted = false;
             fadeStartAtSec = Math.max(0, Math.min(115, durationSec - 5));
             console.log(`(poll) 🆕 Track change detected — ${track.name}, duration=${durationSec}s, fadeStartAt=${fadeStartAtSec}s`);
-            // restore volume
-            try { await player.setVolume(1.0); } catch {}
+            try { await player.setVolume(1.0); } catch (e) {}
           }
-
-          // Trigger fade exactly when we pass fadeStartAtSec
           if (!fadeStarted && fadeStartAtSec != null && positionSec >= fadeStartAtSec) {
             console.log(`⏱ Reached fade point at ${positionSec}s (of ${durationSec}s).`);
             startFadeOutAndSkip();
           }
-        } catch (e) {
-          // ignore transient errors
-        }
+        } catch (e) { /* ignore transient */ }
       }, 500);
     }
   });
 
-  /* ---------- Not Ready ---------- */
+  // ---------- not_ready ----------
   player.addListener('not_ready', ({ device_id }) => {
     console.log('⚠️ Device ID has gone offline', device_id);
     updateStatus('Device went offline');
   });
 
-  /* ---------- Connect ---------- */
+  // connect
   player.connect();
 
-  /* ---------- UI helpers ---------- */
-  function updateStatus(msg) {
-    document.getElementById('status').innerText = msg;
-  }
+  // UI helpers & buttons (keep your existing handlers)
+  function updateStatus(msg) { document.getElementById('status').innerText = msg; }
 
-  /* ---------- Buttons ---------- */
-  document.getElementById('play').addEventListener('click', async () => {
-    await transferPlaybackHere(true);
-    player.resume();
-  });
-
-  document.getElementById('pause').addEventListener('click', () => {
-    player.pause();
-  });
-
-  document.getElementById('next').addEventListener('click', () => {
-    player.nextTrack();
-  });
-
-  document.getElementById('previous').addEventListener('click', () => {
-    player.previousTrack();
-  });
+  document.getElementById('play').addEventListener('click', async () => { await transferPlaybackHere(true); player.resume(); });
+  document.getElementById('pause').addEventListener('click', () => player.pause());
+  document.getElementById('next').addEventListener('click', () => player.nextTrack());
+  document.getElementById('previous').addEventListener('click', () => player.previousTrack());
 
   async function transferPlaybackHere(autoplay = false) {
     const tokenNow = localStorage.getItem('spotify_token');
     const deviceId = window.spotifyDeviceId;
-    if (!deviceId) {
-      updateStatus('Device ID not ready yet');
-      return;
-    }
+    if (!deviceId) { updateStatus('Device ID not ready yet'); return; }
     try {
       await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${tokenNow}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { Authorization: `Bearer ${tokenNow}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ device_ids: [deviceId], play: autoplay })
       });
       updateStatus('Playback transferred to this device');
-    } catch (error) {
-      console.error('Error transferring playback:', error);
-      updateStatus('Failed to transfer playback');
-    }
+    } catch (error) { console.error('Error transferring playback:', error); updateStatus('Failed to transfer playback'); }
   }
+}
 
-  // 🔄 Background token refresh every 55 minutes
-  setInterval(async () => {
-    console.log('⏳ Checking if token needs refresh…');
-    const expiry = localStorage.getItem('token_expiry');
-    if (expiry && Date.now() > expiry - 60000) {
-      console.log('♻️ Refreshing token before expiry…');
-      await refreshAccessToken();
+/* ---------------- wait until Spotify SDK calls this, then wait for token (poll + event) ---------------- */
+window.onSpotifyWebPlaybackSDKReady = () => {
+  // try to initialize if token is already present, else wait up to 10s, also listen for event
+  const tryInit = async () => {
+    let token = localStorage.getItem('spotify_token');
+    const start = Date.now();
+    while (!token && (Date.now() - start) < 10000) { // 10s timeout
+      console.log('⏳ Waiting for spotify_token to appear in localStorage...');
+      await new Promise(r => setTimeout(r, 300));
+      token = localStorage.getItem('spotify_token');
     }
-  }, 3300000);
-};
+    if (token) {
+      console.log('✅ Token found — initializing player.');
+      initPlayer();
+      return;
+    }
+    // fallback: listen for event dispatched by auth.js
+    console.log('🔔 No token yet — attaching event listener for spotify_token_ready.');
+    window.addEventListener('spotify_token_ready', () => {
+      console.log('🔔 spotify_token_ready received — initializing player.');
+      initPlayer();
+    }, { once: true });
 
-/* ---------------- IMPORTANT: make sure only THIS file defines window.onSpotifyWebPlaybackSDKReady ----------------
-   If your page also includes another script (e.g., script.js) that sets window.onSpotifyWebPlaybackSDKReady,
-   it will override this one and the fade will never run. Remove any second definition from the page. */
+    // if still no token after additional timeout, show message
+    setTimeout(() => {
+      if (!localStorage.getItem('spotify_token')) {
+        document.getElementById('status').innerText = 'No Spotify token found. Please log in first.';
+        console.warn('No spotify_token within timeout — user must re-login.');
+      }
+    }, 15000);
+  };
+
+  tryInit();
+};
