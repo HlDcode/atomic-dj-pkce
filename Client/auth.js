@@ -5,7 +5,7 @@ const refreshEndpoint = `${backendUrl}/refresh_token`;
 // ✅ Direct landing page for auth
 const REDIRECT_URI = 'https://atomic-dj.netlify.app/player.html';
 
-// ---------------- PKCE Helpers ----------------
+/* ---------------- PKCE Helpers ---------------- */
 async function generateCodeVerifier(len) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
   return Array.from(crypto.getRandomValues(new Uint8Array(len)))
@@ -28,7 +28,7 @@ async function generateCodeChallenge(v) {
   return base64UrlEncode(hashed);
 }
 
-// ---------------- Redirect to Spotify ----------------
+/* ---------------- Redirect to Spotify ---------------- */
 async function redirectToSpotifyAuth() {
   // Clear tokens when starting fresh login
   localStorage.removeItem('spotify_token');
@@ -57,7 +57,7 @@ async function redirectToSpotifyAuth() {
   window.location = url.toString();
 }
 
-// ---------------- Exchange Code for Token ----------------
+/* ---------------- Exchange Code for Token ---------------- */
 async function fetchAccessToken(code) {
   const codeVerifier = localStorage.getItem('code_verifier');
 
@@ -80,7 +80,7 @@ async function fetchAccessToken(code) {
   return await response.json();
 }
 
-// ---------------- Refresh Access Token ----------------
+/* ---------------- Refresh Access Token ---------------- */
 async function refreshAccessToken() {
   const refresh_token = localStorage.getItem('refresh_token');
   if (!refresh_token) {
@@ -112,7 +112,7 @@ async function refreshAccessToken() {
   }
 }
 
-// ---------------- Handle Redirect After Login ----------------
+/* ---------------- Handle Redirect After Login ---------------- */
 (async () => {
   const params = new URLSearchParams(window.location.search);
 
@@ -131,8 +131,9 @@ async function refreshAccessToken() {
       const expires_in = tokenData.expires_in || 3600;
       localStorage.setItem('token_expiry', Date.now() + expires_in * 1000);
 
-      // ✅ Stay on player.html and remove ?code param
+      // ✅ Remove ?code param but stay on player.html
       window.history.replaceState({}, document.title, window.location.pathname);
+      console.log("✅ Tokens stored in localStorage.");
     } else {
       document.getElementById('status').innerText =
         '❌ Token exchange failed: ' + JSON.stringify(tokenData);
@@ -157,7 +158,7 @@ async function refreshAccessToken() {
   }
 })();
 
-// Attach login button
+/* ---------------- Attach login button (only exists on index.html) ---------------- */
 const loginBtn = document.getElementById('login');
 if (loginBtn) {
   loginBtn.onclick = redirectToSpotifyAuth;
